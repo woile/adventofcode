@@ -1,11 +1,11 @@
-use std::fs;
+use std::{cmp, fs};
 
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_while1},
     character::complete::multispace0,
     combinator::map,
-    multi::{many1, separated_list1},
+    multi::separated_list1,
     sequence::{delimited, pair, preceded, terminated},
     IResult,
 };
@@ -80,10 +80,17 @@ fn parse_set(i: &str) -> IResult<&str, CubeSet> {
         )),
     )(i)?;
     let set = tokens.iter().fold(
+        // uncomment for part 1:
+        // CubeSet {
+        //     red: 0,
+        //     blue: 0,
+        //     green: 0,
+        // },
+        // uncomment for part 2:
         CubeSet {
-            red: 0,
-            blue: 0,
-            green: 0,
+            red: 1,
+            blue: 1,
+            green: 1,
         },
         |acc, x| match x {
             Token::Red(v) => CubeSet {
@@ -115,15 +122,12 @@ fn parse_cube_sets(i: &str) -> IResult<&str, Vec<CubeSet>> {
 fn parse_game_samples(i: &str) -> IResult<&str, (Game, Vec<CubeSet>)> {
     pair(
         parse_game,
-        delimited(
-            multispace0,
-            parse_cube_sets,
-            multispace0,
-        ),
+        delimited(multispace0, parse_cube_sets, multispace0),
     )(i)
 }
 
-fn parser(i: &str) -> Option<usize> {
+// use this parser for the day 2, part 1
+fn parser_part_1(i: &str) -> Option<usize> {
     let (_, (game, cube_sets)) = parse_game_samples(i).unwrap();
 
     let is_out_of_bound = cube_sets
@@ -136,11 +140,31 @@ fn parser(i: &str) -> Option<usize> {
     Some(game.0)
 }
 
+fn parser_part_2(i: &str) -> Option<usize> {
+    let (_, (_, cube_sets)) = parse_game_samples(i).unwrap();
+
+    let final_cubeset = cube_sets.iter().fold(
+        CubeSet {
+            red: 0,
+            blue: 0,
+            green: 0,
+        },
+        |acc, x| CubeSet {
+            red: cmp::max(acc.red, x.red),
+            blue: cmp::max(acc.blue, x.blue),
+            green: cmp::max(acc.green, x.green),
+        },
+    );
+
+    let result = final_cubeset.red * final_cubeset.green * final_cubeset.blue;
+    Some(result)
+}
+
 fn main() {
     let result: usize = fs::read_to_string("input.txt")
         .expect("Something went wrong reading the file")
         .lines()
-        .map(|line| parser(line))
+        .map(|line| parser_part_2(line))
         .flatten()
         .sum();
     println!("{:?}", result);
@@ -252,7 +276,7 @@ mod test {
                 },
             ],
         );
-        let (_ , output) = parse_game_samples(input).unwrap();
+        let (_, output) = parse_game_samples(input).unwrap();
         assert_eq!(output, expected);
     }
 }
