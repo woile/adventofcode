@@ -1,7 +1,6 @@
 use std::fs;
-use std::{thread, time::Duration};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Number {
     value: usize,
     positions: Vec<(usize, usize)>,
@@ -17,11 +16,13 @@ impl Number {
 struct Symbol {
     x: usize,
     y: usize,
+    value: char,
+    adjacent: Vec<Number>,
 }
 
 impl Symbol {
-    fn new(x: usize, y: usize) -> Self {
-        Self { x, y }
+    fn new(x: usize, y: usize, c: char) -> Self {
+        Self { x, y, value: c, adjacent: Vec::new() }
     }
 }
 
@@ -70,7 +71,7 @@ fn main() {
             }
 
             if is_symbol(c) {
-                symbols.push(Symbol::new(x, y));
+                symbols.push(Symbol::new(x, y, c));
             }
         }
         if number_char.len() > 0 {
@@ -81,14 +82,14 @@ fn main() {
     let mut num: i64 = 0;
 
     for number in numbers.iter() {
-        for symbol in symbols.iter() {
+        for symbol in symbols.iter_mut() {
             let mut found = false;
             for position in number.positions.iter() {
                 if is_adjacent(symbol.x, symbol.y, position.0, position.1) {
                     num += number.value as i64;
 
                     found = true;
-                    // thread::sleep(Duration::from_millis(4000));
+                    symbol.adjacent.push(number.clone());
                     break;
                 }
             }
@@ -98,5 +99,15 @@ fn main() {
         }
     }
     println!("{:?}", num);
+
+    // Part 2
+    let s: i64 = symbols.into_iter().map(|v| {
+        if v.adjacent.len() > 1 {
+            v.adjacent.iter().fold(1, |acc, x| acc * x.value as i64)
+        } else {
+            return 0;
+        }
+    }).sum();
+    println!("{:?}", s);
 
 }
