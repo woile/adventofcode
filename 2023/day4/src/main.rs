@@ -1,4 +1,7 @@
-use std::{borrow::BorrowMut, fs, collections::VecDeque};
+use std::{
+    collections::{HashSet, VecDeque},
+    fs,
+};
 
 use winnow::{
     ascii::{digit1, multispace0, multispace1},
@@ -7,8 +10,8 @@ use winnow::{
     PResult, Parser,
 };
 
-type WinningNumbers = Vec<u64>;
-type TicketNumbers = Vec<u64>;
+type WinningNumbers = HashSet<u64>;
+type TicketNumbers = HashSet<u64>;
 
 fn parse_numbers<'s>(i: &mut &'s str) -> PResult<Vec<u64>> {
     separated(0.., digit1.try_map(|v: &str| v.parse::<u64>()), multispace1).parse_next(i)
@@ -16,9 +19,9 @@ fn parse_numbers<'s>(i: &mut &'s str) -> PResult<Vec<u64>> {
 
 fn parse_num_pairs<'s>(i: &mut &'s str) -> PResult<(WinningNumbers, TicketNumbers)> {
     separated_pair(
-        parse_numbers,
+        parse_numbers.map(WinningNumbers::from_iter),
         delimited(multispace0, "|", multispace0),
-        parse_numbers,
+        parse_numbers.map(TicketNumbers::from_iter),
     )
     .parse_next(i)
 }
@@ -40,13 +43,10 @@ fn parse_card<'s>(i: &mut &'s str) -> PResult<(usize, (WinningNumbers, TicketNum
     .parse_next(i)
 }
 
-fn get_points<'s>(i: &mut &'s str) -> u64 {
+fn get_points(i: &str) -> u64 {
     let (_card_id, (winning_numbers, ticket_numbers)) =
-        parse_card(i).expect("to parse the card correctly");
-    let wins = winning_numbers
-        .iter()
-        .filter(|n| ticket_numbers.contains(n))
-        .count();
+        parse_card.parse(i).expect("to parse the card correctly");
+    let wins = winning_numbers.intersection(&ticket_numbers).count();
 
     // part 1
     // match wins {
@@ -63,10 +63,9 @@ fn main() {
         .expect("Something went wrong reading the file")
         .as_mut_str()
         .lines()
-        .map(|line| get_points(line.to_owned().as_str().borrow_mut()))
+        .map(|line| get_points(line))
         .enumerate()
         .collect();
-
 
     // part 2
     let mut options = VecDeque::from(result.clone());
@@ -107,14 +106,17 @@ mod tests {
     fn test_parse_num_pairs() {
         let mut input = "33 13 28 76 16 91 52 41 38 64 | 98 92 96 88 49 10 51  4 15  3";
         let expected = (
-            vec![33, 13, 28, 76, 16, 91, 52, 41, 38, 64],
-            vec![98, 92, 96, 88, 49, 10, 51, 4, 15, 3],
+            WinningNumbers::from_iter(vec![33, 13, 28, 76, 16, 91, 52, 41, 38, 64]),
+            TicketNumbers::from_iter(vec![98, 92, 96, 88, 49, 10, 51, 4, 15, 3]),
         );
         let output = parse_num_pairs(&mut input).expect("something went wrong");
         assert_eq!(output, expected);
 
         let mut input = "41 48 83 86 17 | 83 86  6 31 17  9 48 53";
-        let expected = (vec![41, 48, 83, 86, 17], vec![83, 86, 6, 31, 17, 9, 48, 53]);
+        let expected = (
+            WinningNumbers::from_iter(vec![41, 48, 83, 86, 17]),
+            TicketNumbers::from_iter(vec![83, 86, 6, 31, 17, 9, 48, 53]),
+        );
         let output = parse_num_pairs(&mut input).unwrap();
         assert_eq!(output, expected);
     }
@@ -138,8 +140,8 @@ mod tests {
         let expected = (
             1,
             (
-                vec![33, 13, 28, 76, 16, 91, 52, 41, 38, 64],
-                vec![98, 92, 96, 88, 49, 10, 51, 4, 15, 3],
+                WinningNumbers::from_iter(vec![33, 13, 28, 76, 16, 91, 52, 41, 38, 64]),
+                TicketNumbers::from_iter(vec![98, 92, 96, 88, 49, 10, 51, 4, 15, 3]),
             ),
         );
         let output = parse_card(&mut input).unwrap();
@@ -148,7 +150,10 @@ mod tests {
         let mut input = "Card 2: 41 48 83 86 17 | 83 86  6 31 17  9 48 53";
         let expected = (
             2,
-            (vec![41, 48, 83, 86, 17], vec![83, 86, 6, 31, 17, 9, 48, 53]),
+            (
+                WinningNumbers::from_iter(vec![41, 48, 83, 86, 17]),
+                TicketNumbers::from_iter(vec![83, 86, 6, 31, 17, 9, 48, 53]),
+            ),
         );
         let output = parse_card(&mut input).unwrap();
         assert_eq!(output, expected);
