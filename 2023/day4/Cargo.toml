@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 winnow = "0.5.19"
+queues = "1.1.0"

@@ -1,4 +1,4 @@
-use std::{borrow::BorrowMut, fs};
+use std::{borrow::BorrowMut, fs, collections::VecDeque};
 
 use winnow::{
     ascii::{digit1, multispace0, multispace1},
@@ -48,21 +48,42 @@ fn get_points<'s>(i: &mut &'s str) -> u64 {
         .filter(|n| ticket_numbers.contains(n))
         .count();
 
-    match wins {
-        0 => 0,
-        _ => 2u64.pow((wins - 1) as u32),
-    }
+    // part 1
+    // match wins {
+    //     0 => 0,
+    //     _ => 2u64.pow((wins - 1) as u32),
+    // }
+
+    // part 2
+    return wins as u64;
 }
 
 fn main() {
-    let result: u64 = fs::read_to_string("input.txt")
+    let result: Vec<(usize, u64)> = fs::read_to_string("input.txt")
         .expect("Something went wrong reading the file")
         .as_mut_str()
         .lines()
         .map(|line| get_points(line.to_owned().as_str().borrow_mut()))
-        .sum();
+        .enumerate()
+        .collect();
 
-    println!("{:?}", result);
+
+    // part 2
+    let mut options = VecDeque::from(result.clone());
+    let mut count = 0;
+    while options.len() > 0 {
+        let (position, value) = options.pop_front().unwrap();
+        count += 1;
+        if value == 0 {
+            continue;
+        }
+        let next_index_start = position + 1;
+        let next_index = next_index_start + value as usize;
+        for i in next_index_start..next_index {
+            options.push_back((i, result[i].1));
+        }
+    }
+    println!("{:?}", count);
 }
 
 #[cfg(test)]
