@@ -61,7 +61,6 @@ fn get_points(i: &str) -> u64 {
 fn main() {
     let result: Vec<(usize, u64)> = fs::read_to_string("input.txt")
         .expect("Something went wrong reading the file")
-        .as_mut_str()
         .lines()
         .map(|line| get_points(line))
         .enumerate()
