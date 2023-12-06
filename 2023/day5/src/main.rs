@@ -13,6 +13,13 @@ type TripletRaw = Vec<u64>;
 type SeedToSoil = Vec<Triplet>;
 type DestinationRange = u64;
 type SourceRange = u64;
+type Soil = Vec<Triplet>;
+type Fertilizer = Vec<Triplet>;
+type Water = Vec<Triplet>;
+type Light = Vec<Triplet>;
+type Temp = Vec<Triplet>;
+type Humidity = Vec<Triplet>;
+type Location = Vec<Triplet>;
 
 #[derive(Debug, PartialEq)]
 struct Triplet {
@@ -160,17 +167,36 @@ fn calculate_next(
     }
 }
 
-fn parser_part1(input: &mut &str) -> PResult<u64> {
-    let seeds = parse_seeds
+fn parse_map(
+    input: &mut &str,
+) -> PResult<(
+    Seeds,
+    Soil,
+    Fertilizer,
+    Water,
+    Light,
+    Temp,
+    Humidity,
+    Location,
+)> {
+    (
+        parse_seeds,
+        parse_seeds_to_soil,
+        parse_soil_to_fertilizer,
+        parse_fertilizer_to_water,
+        parse_water_to_light,
+        parse_light_to_temperature,
+        parse_temperature_to_humidity,
+        parse_humidity_to_location,
+    )
         .parse_next(input)
-        .expect("Failed to parse seeds");
+}
+
+fn parser_part1(input: &mut &str) -> PResult<u64> {
+    let (seeds, soil, fertilizer, water, light, temp, humidity, location) =
+        parse_map.parse_next(input).expect("Failed to parse map");
 
     let mut seedmap: HashMap<u64, u64> = seeds.iter().map(|v| (*v, *v)).collect();
-
-    let soil = parse_seeds_to_soil
-        .parse_next(input)
-        .expect("Failed to parse soil");
-
     let mut new_seedmap = HashMap::new();
     for triplet in soil {
         calculate_next(triplet, &seedmap, &mut new_seedmap);
@@ -179,10 +205,6 @@ fn parser_part1(input: &mut &str) -> PResult<u64> {
 
     println!("soil: {:?}", seedmap);
 
-    let fertilizer = parse_soil_to_fertilizer
-        .parse_next(input)
-        .expect("Failed to parse fertilizer");
-
     let mut new_seedmap = HashMap::new();
     for triplet in fertilizer {
         calculate_next(triplet, &seedmap, &mut new_seedmap);
@@ -190,10 +212,6 @@ fn parser_part1(input: &mut &str) -> PResult<u64> {
     seedmap.extend(new_seedmap);
 
     println!("fertilizer: {:?}", seedmap);
-
-    let water = parse_fertilizer_to_water
-        .parse_next(input)
-        .expect("Failed to parse fertilizer");
 
     let mut new_seedmap = HashMap::new();
     for triplet in water {
@@ -205,10 +223,6 @@ fn parser_part1(input: &mut &str) -> PResult<u64> {
 
     // water to light
 
-    let light = parse_water_to_light
-        .parse_next(input)
-        .expect("Failed to parse light");
-
     let mut new_seedmap = HashMap::new();
     for triplet in light {
         calculate_next(triplet, &seedmap, &mut new_seedmap);
@@ -218,9 +232,6 @@ fn parser_part1(input: &mut &str) -> PResult<u64> {
     println!("light: {:?}", seedmap);
 
     // parse_light_to_temperature
-    let temp = parse_light_to_temperature
-        .parse_next(input)
-        .expect("Failed to parse temp");
 
     let mut new_seedmap = HashMap::new();
     for triplet in temp {
@@ -231,9 +242,6 @@ fn parser_part1(input: &mut &str) -> PResult<u64> {
     println!("temp: {:?}", seedmap);
 
     // parse_temperature_to_humidity
-    let humidity = parse_temperature_to_humidity
-        .parse_next(input)
-        .expect("Failed to parse humidity");
 
     let mut new_seedmap = HashMap::new();
     for triplet in humidity {
@@ -244,10 +252,6 @@ fn parser_part1(input: &mut &str) -> PResult<u64> {
     println!("humidity: {:?}", seedmap);
 
     // parse_humidity_to_location
-
-    let location = parse_humidity_to_location
-        .parse_next(input)
-        .expect("Failed to parse location");
 
     let mut new_seedmap = HashMap::new();
     for triplet in location {
@@ -262,7 +266,7 @@ fn parser_part1(input: &mut &str) -> PResult<u64> {
 }
 
 fn main() {
-    let result = fs::read_to_string("sample.txt").expect("Something went wrong reading the file");
+    let result = fs::read_to_string("input.txt").expect("Something went wrong reading the file");
     let out = parser_part1.parse(&result).unwrap();
     println!("{}", out);
 }
