@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs};
+use std::fs;
 
 use itertools::Itertools;
 use winnow::{
@@ -10,7 +10,7 @@ use winnow::{
 type Seeds = Vec<u64>;
 type TripletRaw = Vec<u64>;
 // type SeedToSoil = HashMap<u64, u64>;
-type SeedToSoil = Vec<Triplet>;
+type Triplets = Vec<Triplet>;
 type DestinationRange = u64;
 type SourceRange = u64;
 type Soil = Vec<Triplet>;
@@ -20,12 +20,13 @@ type Light = Vec<Triplet>;
 type Temp = Vec<Triplet>;
 type Humidity = Vec<Triplet>;
 type Location = Vec<Triplet>;
+type Range = (u64, u64);
 
 #[derive(Debug, PartialEq)]
 struct Triplet {
     destination_range: DestinationRange,
     source_range: SourceRange,
-    range: u64,
+    length: u64,
 }
 
 impl Triplet {
@@ -33,12 +34,16 @@ impl Triplet {
         Self {
             destination_range,
             source_range,
-            range,
+            length: range,
         }
     }
 
     fn as_source_range(&self) -> (u64, u64) {
-        (self.source_range, self.source_range + self.range)
+        (self.source_range, self.source_range + self.length)
+    }
+
+    fn as_destination_range(&self) -> (u64, u64) {
+        (self.destination_range, self.destination_range + self.length)
     }
 }
 
@@ -52,19 +57,9 @@ impl SeedRange {
     fn new(start: u64, length: u64) -> Self {
         Self { start, length }
     }
-}
-
-fn parse_triplet(input: &mut &str) -> PResult<Triplet> {
-    separated(3, digit1.try_map(|v: &str| v.parse::<u64>()), " ")
-        .map(|v: TripletRaw| {
-            let mut iter = v.into_iter();
-            Triplet::new(
-                iter.next().unwrap(),
-                iter.next().unwrap(),
-                iter.next().unwrap(),
-            )
-        })
-        .parse_next(input)
+    fn as_range(&self) -> Range {
+        (self.start, self.start + self.length)
+    }
 }
 
 fn parse_seeds(input: &mut &str) -> PResult<Seeds> {
@@ -86,85 +81,85 @@ fn parse_seed_ranges(input: &mut &str) -> PResult<Vec<SeedRange>> {
         .parse_next(input)
 }
 
-fn parse_seeds_to_soil(input: &mut &str) -> PResult<SeedToSoil> {
+fn parse_triplet(input: &mut &str) -> PResult<Triplet> {
+    separated(3, digit1.try_map(|v: &str| v.parse::<u64>()), " ")
+        .map(|v: TripletRaw| {
+            let mut iter = v.into_iter();
+            Triplet::new(
+                iter.next().unwrap(),
+                iter.next().unwrap(),
+                iter.next().unwrap(),
+            )
+        })
+        .parse_next(input)
+}
+
+fn parse_triplets(input: &mut &str) -> PResult<Triplets> {
+    separated(0.., parse_triplet, "\n")
+        .map(|mut v: Triplets| {
+            v.sort_by(|a, b| a.destination_range.cmp(&b.destination_range));
+            v
+        })
+        .parse_next(input)
+}
+fn parse_seeds_to_soil(input: &mut &str) -> PResult<Triplets> {
     preceded(
         delimited(multispace0, "seed-to-soil map:", multispace0),
-        separated(0.., parse_triplet, "\n").map(|v| v),
+        parse_triplets,
     )
     .parse_next(input)
 }
 
-fn parse_soil_to_fertilizer(input: &mut &str) -> PResult<SeedToSoil> {
+fn parse_soil_to_fertilizer(input: &mut &str) -> PResult<Triplets> {
     preceded(
         delimited(multispace0, "soil-to-fertilizer map:", multispace0),
-        separated(0.., parse_triplet, "\n").map(|v| v),
+        parse_triplets,
     )
     .parse_next(input)
 }
 
-fn parse_fertilizer_to_water(input: &mut &str) -> PResult<SeedToSoil> {
+fn parse_fertilizer_to_water(input: &mut &str) -> PResult<Triplets> {
     preceded(
         delimited(multispace0, "fertilizer-to-water map:", multispace0),
-        separated(0.., parse_triplet, "\n").map(|v| v),
+        parse_triplets,
     )
     .parse_next(input)
 }
 
-fn parse_water_to_light(input: &mut &str) -> PResult<SeedToSoil> {
+fn parse_water_to_light(input: &mut &str) -> PResult<Triplets> {
     preceded(
         delimited(multispace0, "water-to-light map:", multispace0),
-        separated(0.., parse_triplet, "\n").map(|v| v),
+        parse_triplets,
     )
     .parse_next(input)
 }
 
-fn parse_light_to_temperature(input: &mut &str) -> PResult<SeedToSoil> {
+fn parse_light_to_temperature(input: &mut &str) -> PResult<Triplets> {
     preceded(
         delimited(multispace0, "light-to-temperature map:", multispace0),
-        separated(0.., parse_triplet, "\n").map(|v| v),
+        parse_triplets,
     )
     .parse_next(input)
 }
 
-fn parse_temperature_to_humidity(input: &mut &str) -> PResult<SeedToSoil> {
+fn parse_temperature_to_humidity(input: &mut &str) -> PResult<Triplets> {
     preceded(
         delimited(multispace0, "temperature-to-humidity map:", multispace0),
-        separated(0.., parse_triplet, "\n").map(|v| v),
+        parse_triplets,
     )
     .parse_next(input)
 }
 
 //
-fn parse_humidity_to_location(input: &mut &str) -> PResult<SeedToSoil> {
+fn parse_humidity_to_location(input: &mut &str) -> PResult<Triplets> {
     terminated(
         preceded(
             delimited(multispace0, "humidity-to-location map:", multispace0),
-            separated(0.., parse_triplet, "\n").map(|v| v),
+            parse_triplets,
         ),
         multispace0,
     )
     .parse_next(input)
-}
-
-fn calculate_next(
-    triplet: Triplet,
-    seedmap: &HashMap<u64, u64>,
-    new_seedmap: &mut HashMap<u64, u64>,
-) -> () {
-    let (start, end) = triplet.as_source_range();
-    for (key, value) in seedmap {
-        let r = start..end;
-        if !r.contains(value) {
-            continue;
-        }
-        let n = value - start;
-
-        // let loc = triplet.source_range + triplet.range - value;
-        let start_dest = triplet.destination_range;
-        let next_val = n + start_dest;
-        // println!("key: {key}, value: {value}, ({start}, {end}) ({start_dest}, {end_dest}): {next_val}" );
-        new_seedmap.insert(*key, next_val);
-    }
 }
 
 fn parse_map(
@@ -192,82 +187,108 @@ fn parse_map(
         .parse_next(input)
 }
 
-fn parser_part1(input: &mut &str) -> PResult<u64> {
-    let (seeds, soil, fertilizer, water, light, temp, humidity, location) =
+fn source_dest_map(val: u64, triplet: &Triplet) -> Option<u64> {
+    let (start, end) = triplet.as_source_range();
+    if val >= start && val < end {
+        let dest = triplet.as_destination_range();
+        let r = val - start;
+        return Some(r + dest.0);
+    }
+    None
+}
+
+fn parse_part1(input: &mut &str) -> PResult<u64> {
+    let (seeds, soil, fertilizer, water, light, temp, humidity, locations) =
         parse_map.parse_next(input).expect("Failed to parse map");
 
-    let mut seedmap: HashMap<u64, u64> = seeds.iter().map(|v| (*v, *v)).collect();
-    let mut new_seedmap = HashMap::new();
-    for triplet in soil {
-        calculate_next(triplet, &seedmap, &mut new_seedmap);
-    }
-    seedmap.extend(new_seedmap);
+    let loc = seeds
+        .into_iter()
+        .map(|seed| {
+            let r = soil
+                .iter()
+                .filter_map(move |triplet| source_dest_map(seed, triplet))
+                .collect_vec();
+            if r.len() == 0 {
+                return vec![seed];
+            }
+            return r;
+        })
+        .flatten()
+        .map(|seed| {
+            let r = fertilizer
+                .iter()
+                .filter_map(move |triplet| source_dest_map(seed, triplet))
+                .collect_vec();
+            if r.len() == 0 {
+                return vec![seed];
+            }
+            return r;
+        })
+        .flatten()
+        .map(|seed| {
+            let r = water
+                .iter()
+                .filter_map(move |triplet| source_dest_map(seed, triplet))
+                .collect_vec();
+            if r.len() == 0 {
+                return vec![seed];
+            }
+            return r;
+        })
+        .flatten()
+        .map(|seed| {
+            let r = light
+                .iter()
+                .filter_map(move |triplet| source_dest_map(seed, triplet))
+                .collect_vec();
+            if r.len() == 0 {
+                return vec![seed];
+            }
+            return r;
+        })
+        .flatten()
+        .map(|seed| {
+            let r = temp
+                .iter()
+                .filter_map(move |triplet| source_dest_map(seed, triplet))
+                .collect_vec();
+            if r.len() == 0 {
+                return vec![seed];
+            }
+            return r;
+        })
+        .flatten()
+        .map(|seed| {
+            let r = humidity
+                .iter()
+                .filter_map(move |triplet| source_dest_map(seed, triplet))
+                .collect_vec();
+            if r.len() == 0 {
+                return vec![seed];
+            }
+            return r;
+        })
+        .flatten()
+        .map(|seed| {
+            let r = locations
+                .iter()
+                .filter_map(move |triplet| source_dest_map(seed, triplet))
+                .collect_vec();
+            if r.len() == 0 {
+                return vec![seed];
+            }
+            return r;
+        })
+        .flatten()
+        .min();
 
-    println!("soil: {:?}", seedmap);
+    Ok(loc.unwrap())
 
-    let mut new_seedmap = HashMap::new();
-    for triplet in fertilizer {
-        calculate_next(triplet, &seedmap, &mut new_seedmap);
-    }
-    seedmap.extend(new_seedmap);
-
-    println!("fertilizer: {:?}", seedmap);
-
-    let mut new_seedmap = HashMap::new();
-    for triplet in water {
-        calculate_next(triplet, &seedmap, &mut new_seedmap);
-    }
-    seedmap.extend(new_seedmap);
-
-    println!("water: {:?}", seedmap);
-
-    // water to light
-
-    let mut new_seedmap = HashMap::new();
-    for triplet in light {
-        calculate_next(triplet, &seedmap, &mut new_seedmap);
-    }
-    seedmap.extend(new_seedmap);
-
-    println!("light: {:?}", seedmap);
-
-    // parse_light_to_temperature
-
-    let mut new_seedmap = HashMap::new();
-    for triplet in temp {
-        calculate_next(triplet, &seedmap, &mut new_seedmap);
-    }
-    seedmap.extend(new_seedmap);
-
-    println!("temp: {:?}", seedmap);
-
-    // parse_temperature_to_humidity
-
-    let mut new_seedmap = HashMap::new();
-    for triplet in humidity {
-        calculate_next(triplet, &seedmap, &mut new_seedmap);
-    }
-    seedmap.extend(new_seedmap);
-
-    println!("humidity: {:?}", seedmap);
-
-    // parse_humidity_to_location
-
-    let mut new_seedmap = HashMap::new();
-    for triplet in location {
-        calculate_next(triplet, &seedmap, &mut new_seedmap);
-    }
-    seedmap.extend(new_seedmap);
-
-    println!("location: {:?}", seedmap);
-
-    Ok(*seedmap.values().min().unwrap())
-    // return Ok(seed);
 }
 
 fn main() {
     let result = fs::read_to_string("input.txt").expect("Something went wrong reading the file");
-    let out = parser_part1.parse(&result).unwrap();
+    let out = parse_part1.parse(&result).unwrap();
     println!("{}", out);
 }
 
@@ -303,5 +324,16 @@ mod tests {
         let input = "seeds: 1 2 3 2";
         let expected = vec![SeedRange::new(1, 2), SeedRange::new(3, 4)];
         assert_eq!(parse_seed_ranges.parse(input), Ok(expected));
+    }
+
+    #[test]
+    fn test_source_dest_map() {
+        let triplet = Triplet::new(37, 52, 2);
+        let expected = Some(38);
+        let out = source_dest_map(53, &triplet);
+        assert_eq!(out, expected);
+        let expected = None;
+        let out = source_dest_map(54, &triplet);
+        assert_eq!(out, expected);
     }
 }
