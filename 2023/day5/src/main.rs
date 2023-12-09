@@ -1,4 +1,4 @@
-use std::fs;
+use std::{fs, cmp};
 
 use itertools::Itertools;
 use winnow::{
@@ -39,11 +39,11 @@ impl Triplet {
     }
 
     fn as_source_range(&self) -> (u64, u64) {
-        (self.source_range, self.source_range + self.length)
+        (self.source_range, self.source_range + self.length - 1)
     }
 
     fn as_destination_range(&self) -> (u64, u64) {
-        (self.destination_range, self.destination_range + self.length)
+        (self.destination_range, self.destination_range + self.length - 1)
     }
 }
 
@@ -58,7 +58,7 @@ impl SeedRange {
         Self { start, length }
     }
     fn as_range(&self) -> Range {
-        (self.start, self.start + self.length)
+        (self.start, self.start + self.length - 1)
     }
 }
 
@@ -70,13 +70,13 @@ fn parse_seeds(input: &mut &str) -> PResult<Seeds> {
     .parse_next(input)
 }
 
-fn parse_seed_ranges(input: &mut &str) -> PResult<Vec<SeedRange>> {
+fn parse_seed_ranges(input: &mut &str) -> PResult<Vec<Range>> {
     parse_seeds
         .map(|v| {
             v.iter()
                 .tuples()
-                .map(|(start, length)| (SeedRange::new(*start, *length)))
-                .collect::<Vec<SeedRange>>()
+                .map(|(start, length)| (SeedRange::new(*start, *length).as_range()))
+                .collect::<Vec<Range>>()
         })
         .parse_next(input)
 }
@@ -165,7 +165,8 @@ fn parse_humidity_to_location(input: &mut &str) -> PResult<Triplets> {
 fn parse_map(
     input: &mut &str,
 ) -> PResult<(
-    Seeds,
+    // Seeds,
+    Vec<Range>,
     Soil,
     Fertilizer,
     Water,
@@ -175,7 +176,8 @@ fn parse_map(
     Location,
 )> {
     (
-        parse_seeds,
+        // parse_seeds,
+        parse_seed_ranges,
         parse_seeds_to_soil,
         parse_soil_to_fertilizer,
         parse_fertilizer_to_water,
@@ -197,6 +199,30 @@ fn source_dest_map(val: u64, triplet: &Triplet) -> Option<u64> {
     None
 }
 
+fn overlap_range(range1: &Range, range2: &Range) -> Option<Range> {
+    let (start1, end1) = range1;
+    let (start2, end2) = range2;
+    if *end1 < *start2 || *end2 < *start1 {
+        return None;
+    }
+
+    Some((cmp::max(*start1, *start2), cmp::min(*end1, *end2)))
+
+}
+
+fn overlap_range_triplet(range: &Range, triplet: &Triplet) -> Option<Range> {
+    let source_range = triplet.as_source_range();
+    let overlap = overlap_range(&source_range, range);
+    if overlap.is_none() {
+        return None;
+    }
+    let overlap = overlap.unwrap();
+
+    let dest_range = triplet.as_destination_range();
+    let overlap_diff = (overlap.0 - source_range.0, source_range.1 - overlap.1);
+    Some((dest_range.0 + overlap_diff.0, dest_range.1 - overlap_diff.1))
+}
+
 fn parse_part1(input: &mut &str) -> PResult<u64> {
     let (seeds, soil, fertilizer, water, light, temp, humidity, locations) =
         parse_map.parse_next(input).expect("Failed to parse map");
@@ -206,7 +232,7 @@ fn parse_part1(input: &mut &str) -> PResult<u64> {
         .map(|seed| {
             let r = soil
                 .iter()
-                .filter_map(move |triplet| source_dest_map(seed, triplet))
+                .filter_map(move |triplet| overlap_range_triplet(&seed, triplet))
                 .collect_vec();
             if r.len() == 0 {
                 return vec![seed];
@@ -217,7 +243,7 @@ fn parse_part1(input: &mut &str) -> PResult<u64> {
         .map(|seed| {
             let r = fertilizer
                 .iter()
-                .filter_map(move |triplet| source_dest_map(seed, triplet))
+                .filter_map(move |triplet| overlap_range_triplet(&seed, triplet))
                 .collect_vec();
             if r.len() == 0 {
                 return vec![seed];
@@ -228,7 +254,7 @@ fn parse_part1(input: &mut &str) -> PResult<u64> {
         .map(|seed| {
             let r = water
                 .iter()
-                .filter_map(move |triplet| source_dest_map(seed, triplet))
+                .filter_map(move |triplet| overlap_range_triplet(&seed, triplet))
                 .collect_vec();
             if r.len() == 0 {
                 return vec![seed];
@@ -239,7 +265,7 @@ fn parse_part1(input: &mut &str) -> PResult<u64> {
         .map(|seed| {
             let r = light
                 .iter()
-                .filter_map(move |triplet| source_dest_map(seed, triplet))
+                .filter_map(move |triplet| overlap_range_triplet(&seed, triplet))
                 .collect_vec();
             if r.len() == 0 {
                 return vec![seed];
@@ -250,7 +276,7 @@ fn parse_part1(input: &mut &str) -> PResult<u64> {
         .map(|seed| {
             let r = temp
                 .iter()
-                .filter_map(move |triplet| source_dest_map(seed, triplet))
+                .filter_map(move |triplet| overlap_range_triplet(&seed, triplet))
                 .collect_vec();
             if r.len() == 0 {
                 return vec![seed];
@@ -261,7 +287,7 @@ fn parse_part1(input: &mut &str) -> PResult<u64> {
         .map(|seed| {
             let r = humidity
                 .iter()
-                .filter_map(move |triplet| source_dest_map(seed, triplet))
+                .filter_map(move |triplet| overlap_range_triplet(&seed, triplet))
                 .collect_vec();
             if r.len() == 0 {
                 return vec![seed];
@@ -272,7 +298,7 @@ fn parse_part1(input: &mut &str) -> PResult<u64> {
         .map(|seed| {
             let r = locations
                 .iter()
-                .filter_map(move |triplet| source_dest_map(seed, triplet))
+                .filter_map(move |triplet| overlap_range_triplet(&seed, triplet))
                 .collect_vec();
             if r.len() == 0 {
                 return vec![seed];
@@ -280,10 +306,11 @@ fn parse_part1(input: &mut &str) -> PResult<u64> {
             return r;
         })
         .flatten()
+        .inspect(|v| println!("loc ranges are: {:?}", v))
+        .map(|seed| seed.0)
         .min();
 
     Ok(loc.unwrap())
-
 }
 
 fn main() {
@@ -322,7 +349,7 @@ mod tests {
     #[test]
     fn test_parse_seed_ranges() {
         let input = "seeds: 1 2 3 2";
-        let expected = vec![SeedRange::new(1, 2), SeedRange::new(3, 4)];
+        let expected = vec![(1, 2), (3, 4)];
         assert_eq!(parse_seed_ranges.parse(input), Ok(expected));
     }
 
@@ -334,6 +361,30 @@ mod tests {
         assert_eq!(out, expected);
         let expected = None;
         let out = source_dest_map(54, &triplet);
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn test_overlap_range() {
+        let source = (2, 8);
+        let dest = (5, 10);
+        let expected = Some((5, 8));
+        let out = overlap_range(&source, &dest);
+        assert_eq!(out, expected);
+
+        let source = (64, 76);
+        let dest = (46, 87);
+        let expected = Some((64, 76));
+        let out = overlap_range(&source, &dest);
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn test_overlap_range_triplet() {
+        let triplet = Triplet::new(37, 52, 2);
+        let range = (53, 55);
+        let expected = Some((38, 38));
+        let out = overlap_range_triplet(&range, &triplet, );
         assert_eq!(out, expected);
     }
 }
