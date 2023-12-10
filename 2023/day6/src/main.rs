@@ -18,9 +18,12 @@ fn main() {
         .trim()
         .lines()
         .map(|x| x.split_at(11).1)
-        .map(|x| x.split_whitespace().map(|v| v.parse::<usize>().unwrap()));
-    let time = r.next().unwrap();
-    let distance = r.next().unwrap();
+        .map(|x| x.chars().filter(char::is_ascii_digit).collect::<String>().parse::<usize>().unwrap());
+        // part 1
+        // .map(|x| x.split_whitespace().map(|v| v.parse::<usize>().unwrap()));
+        // .map(|x| x.parse::<usize>().unwrap());
+    let time = vec![r.next().unwrap()];
+    let distance = vec![r.next().unwrap()];
 
     let w = zip(time, distance)
         .map(|b| {
