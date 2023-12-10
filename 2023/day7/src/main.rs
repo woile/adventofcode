@@ -29,7 +29,7 @@ impl Hand<'_> {
                 (Some(self_card), Some(other_card)) => {
                     let self_card = match self_card {
                         'A' => 'T',
-                        'J' => 'J',
+                        'J' => '1',
                         'K' => 'Q',
                         'Q' => 'K',
                         'T' => 'A',
@@ -37,7 +37,7 @@ impl Hand<'_> {
                     };
                     let other_card = match other_card {
                         'A' => 'T',
-                        'J' => 'J',
+                        'J' => '1',
                         'K' => 'Q',
                         'Q' => 'K',
                         'T' => 'A',
@@ -65,6 +65,31 @@ impl<'a> From<&'a str> for Hand<'a> {
             let count = card_counts.entry(card).or_insert(0);
             *count += 1;
         }
+
+        let mut charx = 'x';
+        let mut new_val = 0;
+        if let Some(count) = card_counts.get(&'J') {
+            let mut max = 0;
+            for (card, ccount) in card_counts.iter() {
+                if card == &'J' {
+                    continue;
+                }
+
+                if ccount > &max {
+                    max = *ccount;
+                    charx = *card;
+                    new_val = *count;
+                }
+            }
+        }
+        if charx != 'x' {
+            card_counts.remove(&'J');
+            // let jok = card_counts.entry('J').or_insert(0);
+            // *jok = 0;
+            let other = card_counts.entry(charx).or_insert(0);
+            *other += new_val;
+        }
+
         let mut counts = card_counts.values().collect::<Vec<_>>();
         counts.sort();
         counts.reverse();
@@ -134,7 +159,7 @@ impl PartialEq for Hand<'_> {
     }
 }
 
-fn part1(input: &str) -> u64 {
+fn part2(input: &str) -> u64 {
     let mut hands = input.lines().map(|line| line.split_at(5)).map(|(hand, bid)| {
         (Hand::from(hand), bid.trim().parse::<u64>().expect(format!("Invalid bid: {}", bid).as_str()))
     }).collect::<Vec<(Hand, u64)>>();
@@ -144,7 +169,7 @@ fn part1(input: &str) -> u64 {
 
 fn main() {
     let raw = fs::read_to_string("input.txt").expect("Something went wrong reading the file");
-    println!("{}", part1(raw.trim()));
+    println!("{}", part2(raw.trim()));
 }
 
 #[cfg(test)]
@@ -174,6 +199,7 @@ mod tests {
         Hand::cmp_internal("33332", "2AAAA");
         assert!(Hand::cmp_internal("33332", "2AAAA") == Ordering::Greater);
         assert!(Hand::cmp_internal("77888", "77788") == Ordering::Greater);
+        assert!(Hand::cmp_internal("AA888", "TTT88") == Ordering::Greater);
         assert!(Hand::cmp_internal("AA888", "TTT88") == Ordering::Greater);
     }
 
@@ -219,6 +245,18 @@ mod tests {
         let input = "23456";
         let hand = Hand::from(input);
         assert_eq!(hand, Hand::HighCard(input));
+
+        let input = "QQQJA";
+        let hand = Hand::from(input);
+        assert_eq!(hand, Hand::FourOfAKind(input));
+
+        let input = "T55J5";
+        let hand = Hand::from(input);
+        assert_eq!(hand, Hand::FourOfAKind(input));
+
+        let input = "KTJJT";
+        let hand = Hand::from(input);
+        assert_eq!(hand, Hand::FourOfAKind(input));
     }
 
     #[test]
