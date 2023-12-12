@@ -74,26 +74,15 @@ fn part2(i: &str) -> usize {
             for dir in instructions.chars() {
                 match dir {
                     'L' => {
-                        // ops = ops
-                        //     .iter()
-                        //     .map(|o| &(s.get(*o).unwrap().0))
-                        //     .collect::<Vec<&&str>>();
                         current_loc = s.get(&current_loc).unwrap().0;
                         steps += 1;
                     }
                     'R' => {
-                        // ops = ops
-                        //     .iter()
-                        //     .map(|o| &(s.get(*o).unwrap().1))
-                        //     .collect::<Vec<&&str>>();
                         current_loc = s.get(&current_loc).unwrap().1;
                         steps += 1;
                     }
                     _ => unreachable!("Letter not found"),
                 };
-                // if ops.iter().all(|o| o.ends_with("Z")) {
-                //     break;
-                // }
                 if current_loc.ends_with("Z") {
                     break;
                 }
@@ -111,14 +100,4 @@ fn main() {
     let raw = fs::read_to_string("input.txt").expect("Something went wrong reading the file");
     let out = part2(raw.trim());
     println!("{out}");
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_part1() {
-        assert_eq!(part1(""), 1);
-    }
 }
