@@ -20,9 +20,29 @@ fn part1(i: &str) -> i128 {
         .sum()
 }
 
+fn prev_series(i: &[i128]) -> i128 {
+    if i.iter().all(|x| x == &0) {
+        return 0;
+    }
+    let r = i.windows(2).map(|x| x[0] - x[1]).collect::<Vec<i128>>();
+
+    i.first().unwrap() + prev_series(&r)
+}
+
+fn part2(i: &str) -> i128 {
+    i.lines()
+        .map(|x| {
+            x.split(" ")
+                .map(|v| v.parse::<i128>().unwrap())
+                .collect::<Vec<i128>>()
+        })
+        .map(|x| prev_series(&x))
+        .sum()
+}
+
 fn main() {
     let raw = fs::read_to_string("input.txt").expect("Something went wrong reading the file");
-    let out = part1(raw.trim());
+    let out = part2(raw.trim());
     println!("{}", out);
 }
 
